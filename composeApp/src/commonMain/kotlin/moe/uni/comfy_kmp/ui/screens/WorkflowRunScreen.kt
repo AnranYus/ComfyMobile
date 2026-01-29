@@ -7,6 +7,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -25,14 +27,11 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.BottomSheetScaffold
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -49,6 +48,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.rememberScreenModel
@@ -78,7 +79,7 @@ import moe.uni.comfy_kmp.data.extractImagesFromHistory
 import moe.uni.comfy_kmp.data.extractPromptObject
 import moe.uni.comfy_kmp.data.parsePromptNodes
 import moe.uni.comfy_kmp.data.saveCoverImage
-import moe.uni.comfy_kmp.data.saveToTemp
+import moe.uni.comfy_kmp.data.saveImageToGallery
 import moe.uni.comfy_kmp.data.updateNodeInput
 import moe.uni.comfy_kmp.di.LocalAppContainer
 import moe.uni.comfy_kmp.network.ComfyApiClient
@@ -127,92 +128,123 @@ data class WorkflowRunScreen(val workflowId: String) : Screen {
         )
 
         val comfyColors = MaterialTheme.comfyColors
+        val sheetPeekHeight = 120.dp
 
-        BottomSheetScaffold(
-            scaffoldState = scaffoldState,
-            sheetPeekHeight = 120.dp,
-            sheetContainerColor = comfyColors.cardBackground,
-            sheetContentColor = MaterialTheme.colorScheme.onSurface,
-            sheetShape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-            sheetDragHandle = {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Box(
-                        modifier = Modifier
-                            .width(40.dp)
-                            .height(4.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "节点状态 (${model.nodeStates.size})",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-            },
-            sheetContent = {
-                NodeListSheet(
-                    nodes = model.orderedNodeStates,
-                    randomSeedNodes = model.randomSeedNodes,
-                    modelChoices = model.modelChoices,
-                    loadingModels = model.loadingModels,
-                    onInputChange = { nodeId, field, value -> model.updateNodeInput(nodeId, field, value) },
-                    onRandomSeedToggle = { nodeId, enabled -> model.setRandomSeedMode(nodeId, enabled) },
-                    onRandomizeSeed = { nodeId -> model.randomizeSeed(nodeId) },
-                    onLoadModels = { nodeId -> model.loadModelsForNode(nodeId) },
-                    modifier = Modifier.navigationBarsPadding()
-                )
-            },
-            topBar = {
-                WorkflowRunTopBar(
-                    onBack = { navigator.pop() },
-                    status = model.executionStatus,
-                    statusText = model.statusText,
-                    progress = model.progress,
-                    progressText = model.progressText,
-                    isRunning = model.running,
-                    onStart = { model.runWorkflow() },
-                    onInterrupt = { model.interrupt() }
-                )
-            },
-            containerColor = MaterialTheme.colorScheme.background
-        ) { padding ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                comfyColors.gradientStart,
-                                comfyColors.gradientEnd
-                            )
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val density = LocalDensity.current
+            val layoutHeightPx = with(density) { maxHeight.toPx() }
+            val peekHeightPx = with(density) { sheetPeekHeight.toPx() }
+
+            BottomSheetScaffold(
+                scaffoldState = scaffoldState,
+                sheetPeekHeight = sheetPeekHeight,
+                sheetContainerColor = comfyColors.cardBackground,
+                sheetContentColor = MaterialTheme.colorScheme.onSurface,
+                sheetShape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                sheetDragHandle = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Box(
+                            modifier = Modifier
+                                .width(40.dp)
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
                         )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "节点状态 (${model.nodeStates.size})",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                },
+                sheetContent = {
+                    NodeListSheet(
+                        nodes = model.orderedNodeStates,
+                        randomSeedNodes = model.randomSeedNodes,
+                        modelChoices = model.modelChoices,
+                        loadingModels = model.loadingModels,
+                        onInputChange = { nodeId, field, value -> model.updateNodeInput(nodeId, field, value) },
+                        onRandomSeedToggle = { nodeId, enabled -> model.setRandomSeedMode(nodeId, enabled) },
+                        onRandomizeSeed = { nodeId -> model.randomizeSeed(nodeId) },
+                        onLoadModels = { nodeId -> model.loadModelsForNode(nodeId) },
+                        modifier = Modifier.navigationBarsPadding()
                     )
-            ) {
-                ImageGallery(
-                    images = model.galleryImages,
-                    onImageClick = { index ->
-                        model.getPreviewImage(index)?.let { preview ->
-                            navigator.push(
-                                ImagePreviewScreen(
-                                    preview.filename,
-                                    preview.bytes,
-                                    onSave = { model.saveImage(index) }
+                },
+                topBar = {
+                    WorkflowRunTopBar(
+                        onBack = { navigator.pop() },
+                        status = model.executionStatus,
+                        statusText = model.statusText,
+                        progress = model.progress,
+                        progressText = model.progressText
+                    )
+                },
+                containerColor = MaterialTheme.colorScheme.background
+            ) { padding ->
+                val layoutDirection = LocalLayoutDirection.current
+                val startPadding = padding.calculateLeftPadding(layoutDirection)
+                val endPadding = padding.calculateRightPadding(layoutDirection)
+                val contentPadding = PaddingValues(
+                    start = startPadding,
+                    top = padding.calculateTopPadding(),
+                    end = endPadding,
+                    bottom = 0.dp
+                )
+                val sheetOffsetPx = runCatching {
+                    scaffoldState.bottomSheetState.requireOffset()
+                }.getOrElse { (layoutHeightPx - peekHeightPx).coerceAtLeast(0f) }
+                val sheetHeightPx = (layoutHeightPx - sheetOffsetPx).coerceAtLeast(0f)
+                val sheetHeightOffset = with(density) { sheetHeightPx.toDp() }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    comfyColors.gradientStart,
+                                    comfyColors.gradientEnd
                                 )
                             )
-                        }
-                    },
-                    onSaveClick = { index -> model.saveImage(index) },
-                    onSetCoverClick = { index -> model.setCoverImage(index) },
-                    modifier = Modifier.fillMaxSize()
-                )
+                        )
+                ) {
+                    ImageGallery(
+                        images = model.galleryImages,
+                        onImageClick = { index ->
+                            model.getPreviewImage(index)?.let { preview ->
+                                navigator.push(
+                                    ImagePreviewScreen(
+                                        preview.filename,
+                                        preview.bytes,
+                                        onSave = { model.saveImage(index) }
+                                    )
+                                )
+                            }
+                        },
+                        onSaveClick = { index -> model.saveImage(index) },
+                        onSetCoverClick = { index -> model.setCoverImage(index) },
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(contentPadding)
+                    )
+
+                    WorkflowRunFab(
+                        isRunning = model.running,
+                        onStart = { model.runWorkflow() },
+                        onInterrupt = { model.interrupt() },
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .navigationBarsPadding()
+                            .padding(end = ComfySpacing.lg, bottom = ComfySpacing.lg)
+                            .offset(y = -sheetHeightOffset)
+                    )
+                }
             }
         }
     }
@@ -230,10 +262,7 @@ private fun WorkflowRunTopBar(
     status: ExecutionStatus,
     statusText: String,
     progress: Float?,
-    progressText: String?,
-    isRunning: Boolean,
-    onStart: () -> Unit,
-    onInterrupt: () -> Unit
+    progressText: String?
 ) {
     Column(
         modifier = Modifier
@@ -250,43 +279,6 @@ private fun WorkflowRunTopBar(
                     )
                 }
             },
-            actions = {
-                AnimatedContent(
-                    targetState = isRunning,
-                    transitionSpec = { fadeIn() togetherWith fadeOut() }
-                ) { running ->
-                    if (running) {
-                        OutlinedButton(
-                            onClick = onInterrupt,
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = MaterialTheme.colorScheme.error
-                            ),
-                            modifier = Modifier.padding(end = ComfySpacing.sm)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Stop,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(ComfySpacing.xs))
-                            Text("中断")
-                        }
-                    } else {
-                        FilledTonalButton(
-                            onClick = onStart,
-                            modifier = Modifier.padding(end = ComfySpacing.sm)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.PlayArrow,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(ComfySpacing.xs))
-                            Text("开始执行")
-                        }
-                    }
-                }
-            },
             colors = TopAppBarDefaults.topAppBarColors(
                 containerColor = MaterialTheme.colorScheme.surface
             )
@@ -298,6 +290,51 @@ private fun WorkflowRunTopBar(
             progress = progress,
             progressText = progressText
         )
+    }
+}
+
+@Composable
+private fun WorkflowRunFab(
+    isRunning: Boolean,
+    onStart: () -> Unit,
+    onInterrupt: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(modifier = modifier) {
+        AnimatedContent(
+            targetState = isRunning,
+            transitionSpec = { fadeIn() togetherWith fadeOut() }
+        ) { running ->
+            if (running) {
+                ExtendedFloatingActionButton(
+                    onClick = onInterrupt,
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Default.Stop,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
+                    text = { Text("中断") },
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                )
+            } else {
+                ExtendedFloatingActionButton(
+                    onClick = onStart,
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
+                    text = { Text("开始执行") },
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+        }
     }
 }
 
@@ -719,8 +756,8 @@ private class WorkflowRunScreenModel(
         val bytes = imageBytes[ref.filename] ?: return
         screenModelScope.launch {
             try {
-                val path = saveToTemp(bytes, ref.filename)
-                statusText = "已保存: $path"
+                val location = saveImageToGallery(bytes, ref.filename)
+                statusText = "已保存: $location"
             } catch (e: Exception) {
                 statusText = "保存失败: ${e.message}"
             }

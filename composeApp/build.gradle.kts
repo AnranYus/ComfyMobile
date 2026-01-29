@@ -23,6 +23,7 @@ kotlin {
         iosTarget.binaries.framework {
             baseName = "ComposeApp"
             isStatic = true
+            linkerOpts("-framework", "Photos")
         }
     }
 
@@ -94,4 +95,3 @@ android {
 dependencies {
     debugImplementation(libs.compose.uiTooling)
 }
-
