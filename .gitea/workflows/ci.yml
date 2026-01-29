@@ -28,8 +28,11 @@ jobs:
           echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
 
       - name: Install Android SDK packages
+        shell: bash
         run: |
-          yes | sdkmanager --licenses
+          # Avoid SIGPIPE failures under pipefail when auto-accepting licenses.
+          set +o pipefail
+          yes | sdkmanager --licenses > /dev/null
           sdkmanager "platforms;android-36" "platform-tools"
 
       - name: Build (Android)
