@@ -39,13 +39,13 @@ jobs:
         run: ./gradlew :composeApp:assembleDebug :composeApp:testDebugUnitTest --no-daemon --stacktrace
 
       - name: Upload APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: android-apk
           path: composeApp/build/outputs/apk/debug/*.apk
 
       - name: Upload Test Report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: test-report
           path: composeApp/build/reports/tests/testDebugUnitTest/
