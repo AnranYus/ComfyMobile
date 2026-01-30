@@ -19,53 +19,53 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// Light Mode Colors
-private val LightPrimary = Color(0xFF0EA5E9)          // 电光蓝
+// Light Mode Colors - Blue 蓝色系
+private val LightPrimary = Color(0xFF2563EB)          // Blue 600
 private val LightOnPrimary = Color(0xFFFFFFFF)
-private val LightPrimaryContainer = Color(0xFFE0F2FE)
-private val LightOnPrimaryContainer = Color(0xFF0C4A6E)
-private val LightSecondary = Color(0xFF6366F1)        // 靛蓝
+private val LightPrimaryContainer = Color(0xFFDBEAFE) // Blue 100
+private val LightOnPrimaryContainer = Color(0xFF1E3A8A) // Blue 900
+private val LightSecondary = Color(0xFF3B82F6)        // Blue 500
 private val LightOnSecondary = Color.White
-private val LightSecondaryContainer = Color(0xFFE0E7FF)
-private val LightOnSecondaryContainer = Color(0xFF3730A3)
-private val LightTertiary = Color(0xFF10B981)         // 翡翠绿
+private val LightSecondaryContainer = Color(0xFFBFDBFE) // Blue 200
+private val LightOnSecondaryContainer = Color(0xFF1E40AF) // Blue 800
+private val LightTertiary = Color(0xFF8B5CF6)         // Violet 500
 private val LightOnTertiary = Color.White
-private val LightTertiaryContainer = Color(0xFFD1FAE5)
-private val LightOnTertiaryContainer = Color(0xFF065F46)
-private val LightBackground = Color(0xFFF5F5F7)
-private val LightOnBackground = Color(0xFF1A1A1A)
+private val LightTertiaryContainer = Color(0xFFEDE9FE) // Violet 100
+private val LightOnTertiaryContainer = Color(0xFF5B21B6) // Violet 800
+private val LightBackground = Color(0xFFF8FAFC)       // Slate 50
+private val LightOnBackground = Color(0xFF1E293B)     // Slate 800
 private val LightSurface = Color(0xFFFFFFFF)
-private val LightOnSurface = Color(0xFF1A1A1A)
-private val LightSurfaceVariant = Color(0xFFE8E8ED)
-private val LightOnSurfaceVariant = Color(0xFF4A4A52)
-private val LightOutline = Color(0xFFD1D5DB)
-private val LightOutlineVariant = Color(0xFFE5E7EB)
-private val LightError = Color(0xFFEF4444)
+private val LightOnSurface = Color(0xFF1E293B)        // Slate 800
+private val LightSurfaceVariant = Color(0xFFF1F5F9)   // Slate 100
+private val LightOnSurfaceVariant = Color(0xFF475569) // Slate 600
+private val LightOutline = Color(0xFFCBD5E1)          // Slate 300
+private val LightOutlineVariant = Color(0xFFE2E8F0)   // Slate 200
+private val LightError = Color(0xFFDC2626)            // Red 600
 private val LightOnError = Color.White
 
-// Dark Mode Colors
-private val DarkPrimary = Color(0xFF38BDF8)           // 电光蓝
-private val DarkOnPrimary = Color(0xFF0C1929)
-private val DarkPrimaryContainer = Color(0xFF0369A1)
-private val DarkOnPrimaryContainer = Color(0xFFBAE6FD)
-private val DarkSecondary = Color(0xFFA78BFA)         // 紫罗兰
-private val DarkOnSecondary = Color(0xFF1E1B4B)
-private val DarkSecondaryContainer = Color(0xFF4C1D95)
-private val DarkOnSecondaryContainer = Color(0xFFEDE9FE)
-private val DarkTertiary = Color(0xFF34D399)          // 翡翠绿
-private val DarkOnTertiary = Color(0xFF052E16)
-private val DarkTertiaryContainer = Color(0xFF065F46)
-private val DarkOnTertiaryContainer = Color(0xFFA7F3D0)
-private val DarkBackground = Color(0xFF0D0D12)
-private val DarkOnBackground = Color(0xFFE8E8ED)
-private val DarkSurface = Color(0xFF1A1A24)
-private val DarkOnSurface = Color(0xFFE8E8ED)
-private val DarkSurfaceVariant = Color(0xFF2A2A36)
-private val DarkOnSurfaceVariant = Color(0xFFA1A1AA)
-private val DarkOutline = Color(0xFF3F3F46)
-private val DarkOutlineVariant = Color(0xFF27272A)
-private val DarkError = Color(0xFFF87171)
-private val DarkOnError = Color(0xFF1A0A0A)
+// Dark Mode Colors - Blue 蓝色系
+private val DarkPrimary = Color(0xFF60A5FA)           // Blue 400
+private val DarkOnPrimary = Color(0xFF1E3A8A)         // Blue 900
+private val DarkPrimaryContainer = Color(0xFF1E40AF) // Blue 800
+private val DarkOnPrimaryContainer = Color(0xFFDBEAFE) // Blue 100
+private val DarkSecondary = Color(0xFF93C5FD)         // Blue 300
+private val DarkOnSecondary = Color(0xFF1E3A8A)       // Blue 900
+private val DarkSecondaryContainer = Color(0xFF1D4ED8) // Blue 700
+private val DarkOnSecondaryContainer = Color(0xFFBFDBFE) // Blue 200
+private val DarkTertiary = Color(0xFFA78BFA)          // Violet 400
+private val DarkOnTertiary = Color(0xFF4C1D95)        // Violet 900
+private val DarkTertiaryContainer = Color(0xFF6D28D9) // Violet 700
+private val DarkOnTertiaryContainer = Color(0xFFEDE9FE) // Violet 100
+private val DarkBackground = Color(0xFF0F172A)        // Slate 900
+private val DarkOnBackground = Color(0xFFE2E8F0)      // Slate 200
+private val DarkSurface = Color(0xFF1E293B)           // Slate 800
+private val DarkOnSurface = Color(0xFFE2E8F0)         // Slate 200
+private val DarkSurfaceVariant = Color(0xFF334155)    // Slate 700
+private val DarkOnSurfaceVariant = Color(0xFF94A3B8)  // Slate 400
+private val DarkOutline = Color(0xFF475569)           // Slate 600
+private val DarkOutlineVariant = Color(0xFF334155)    // Slate 700
+private val DarkError = Color(0xFFF87171)             // Red 400
+private val DarkOnError = Color(0xFF7F1D1D)           // Red 900
 
 private val LightColors = lightColorScheme(
     primary = LightPrimary,
@@ -240,14 +240,14 @@ private val LightExtendedColors = ComfyExtendedColors(
     onWarning = Color(0xFF1A1A1A),
     warningContainer = Color(0xFFFEF3C7),
     cardBackground = Color.White,
-    cardBorder = Color(0xFFE5E7EB),
-    shimmerBase = Color(0xFFE5E7EB),
-    shimmerHighlight = Color(0xFFF3F4F6),
-    gradientStart = Color(0xFFF5F5F7),
-    gradientEnd = Color(0xFFE8E8ED),
-    nodeRunning = Color(0xFF0EA5E9),
+    cardBorder = Color(0xFFE2E8F0),          // Slate 200
+    shimmerBase = Color(0xFFE2E8F0),         // Slate 200
+    shimmerHighlight = Color(0xFFF1F5F9),    // Slate 100
+    gradientStart = Color(0xFFF8FAFC),       // Slate 50
+    gradientEnd = Color(0xFFF1F5F9),         // Slate 100
+    nodeRunning = Color(0xFF2563EB),         // Blue 600
     nodeCompleted = Color(0xFF10B981),
-    nodePending = Color(0xFF9CA3AF)
+    nodePending = Color(0xFF94A3B8)          // Slate 400
 )
 
 private val DarkExtendedColors = ComfyExtendedColors(
@@ -257,15 +257,15 @@ private val DarkExtendedColors = ComfyExtendedColors(
     warning = Color(0xFFFBBF24),
     onWarning = Color(0xFF1A1A1A),
     warningContainer = Color(0xFF78350F),
-    cardBackground = Color(0xFF1F1F2A),
-    cardBorder = Color(0xFF3F3F46),
-    shimmerBase = Color(0xFF27272A),
-    shimmerHighlight = Color(0xFF3F3F46),
-    gradientStart = Color(0xFF0D0D12),
-    gradientEnd = Color(0xFF1A1A24),
-    nodeRunning = Color(0xFF38BDF8),
+    cardBackground = Color(0xFF1E293B),      // Slate 800
+    cardBorder = Color(0xFF475569),          // Slate 600
+    shimmerBase = Color(0xFF334155),         // Slate 700
+    shimmerHighlight = Color(0xFF475569),    // Slate 600
+    gradientStart = Color(0xFF0F172A),       // Slate 900
+    gradientEnd = Color(0xFF1E293B),         // Slate 800
+    nodeRunning = Color(0xFF60A5FA),         // Blue 400
     nodeCompleted = Color(0xFF34D399),
-    nodePending = Color(0xFF6B7280)
+    nodePending = Color(0xFF64748B)          // Slate 500
 )
 
 val LocalComfyColors = staticCompositionLocalOf { LightExtendedColors }
