@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		338A2ACE269EA4A9809609C8 /* comfy_kmp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = comfy_kmp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		338A2ACE269EA4A9809609C8 /* comfyKmp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = comfyKmp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -59,7 +59,7 @@
 		657B04DAB4CB0FD124755A63 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				338A2ACE269EA4A9809609C8 /* comfy_kmp.app */,
+				338A2ACE269EA4A9809609C8 /* comfyKmp.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -87,7 +87,7 @@
 			packageProductDependencies = (
 			);
 			productName = iosApp;
-			productReference = 338A2ACE269EA4A9809609C8 /* comfy_kmp.app */;
+			productReference = 338A2ACE269EA4A9809609C8 /* comfyKmp.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */

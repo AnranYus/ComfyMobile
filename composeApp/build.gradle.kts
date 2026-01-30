@@ -1,4 +1,3 @@
-import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -66,11 +65,11 @@ kotlin {
 }
 
 android {
-    namespace = "moe.uni.comfy_kmp"
+    namespace = "moe.uni.comfyKmp"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
     defaultConfig {
-        applicationId = "moe.uni.comfy_kmp"
+        applicationId = "moe.uni.comfyKmp"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1

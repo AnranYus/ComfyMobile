@@ -1,4 +1,4 @@
-rootProject.name = "comfy_kmp"
+rootProject.name = "comfyKmp"
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 pluginManagement {
