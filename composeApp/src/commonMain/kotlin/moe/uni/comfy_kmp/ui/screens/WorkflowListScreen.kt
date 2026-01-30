@@ -49,6 +49,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -86,6 +87,10 @@ data class WorkflowListScreen(val serverId: String) : Screen {
         val navigator = LocalNavigator.currentOrThrow
         val container = LocalAppContainer.current
         val model = rememberScreenModel { WorkflowListScreenModel(serverId, container.workflowRepository) }
+
+        LaunchedEffect(Unit) {
+            model.refresh()
+        }
 
         var showImport by remember { mutableStateOf(false) }
         
@@ -199,6 +204,10 @@ private class WorkflowListScreenModel(
     var workflows by mutableStateOf(repository.getWorkflows(serverId))
         private set
 
+    fun refresh() {
+        workflows = repository.getWorkflows(serverId)
+    }
+
     fun addWorkflow(name: String, json: String) {
         val workflow = WorkflowEntity(
             id = generateId("workflow"),
@@ -208,12 +217,12 @@ private class WorkflowListScreenModel(
             updatedAt = Clock.System.now().epochSeconds
         )
         repository.upsertWorkflow(workflow)
-        workflows = repository.getWorkflows(serverId)
+        refresh()
     }
 
     fun deleteWorkflow(id: String) {
         repository.deleteWorkflow(id)
-        workflows = repository.getWorkflows(serverId)
+        refresh()
     }
 }
 
@@ -325,18 +334,17 @@ private fun WorkflowCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(0.85f)
             .shadow(4.dp, shape)
             .clip(shape)
             .background(comfyColors.cardBackground)
             .clickable(onClick = onRun)
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            // Cover image area (3/4)
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // Cover image area (4:3)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(4f)
+                    .aspectRatio(4f / 3f)
                     .background(MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 if (coverBitmap != null) {
@@ -372,11 +380,10 @@ private fun WorkflowCard(
                 }
             }
             
-            // Info and actions area (1/4)
+            // Info and actions area
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
                     .background(comfyColors.cardBackground)
                     .padding(ComfySpacing.md),
                 verticalArrangement = Arrangement.SpaceBetween,
