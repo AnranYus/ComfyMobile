@@ -84,9 +84,11 @@ import moe.uni.comfy_kmp.data.updateNodeInput
 import moe.uni.comfy_kmp.di.LocalAppContainer
 import moe.uni.comfy_kmp.network.ComfyApiClient
 import moe.uni.comfy_kmp.network.ComfyWebSocketClient
+import moe.uni.comfy_kmp.network.WsConnectionStatus
 import moe.uni.comfy_kmp.storage.ServerRepository
 import moe.uni.comfy_kmp.storage.WorkflowRepository
 import moe.uni.comfy_kmp.storage.generateId
+import moe.uni.comfy_kmp.ui.components.EditableNodeType
 import moe.uni.comfy_kmp.ui.components.EditableNodeCard
 import moe.uni.comfy_kmp.ui.components.ExecutionStatus
 import moe.uni.comfy_kmp.ui.components.ExecutionStatusBar
@@ -222,13 +224,13 @@ data class WorkflowRunScreen(val workflowId: String) : Screen {
                                     ImagePreviewScreen(
                                         preview.filename,
                                         preview.bytes,
-                                        onSave = { model.saveImage(index) }
+                                        onSave = { model.saveImage(index) },
+                                        onSetCover = { model.setCoverImage(index) }
                                     )
                                 )
                             }
                         },
                         onSaveClick = { index -> model.saveImage(index) },
-                        onSetCoverClick = { index -> model.setCoverImage(index) },
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(contentPadding)
@@ -424,6 +426,8 @@ private class WorkflowRunScreenModel(
     private var imageBytes by mutableStateOf<Map<String, ByteArray>>(emptyMap())
     private var isLoadingImages by mutableStateOf(false)
     private var saveJob: Job? = null
+    private var wsEventsJob: Job? = null
+    private var wsStateJob: Job? = null
     
     val galleryImages: List<GalleryImage>
         get() = imageRefs.map { ref ->
@@ -445,6 +449,10 @@ private class WorkflowRunScreenModel(
         }
 
     init {
+        randomSeedNodes = nodeStates
+            .filter { detectNodeType(it.classType) == EditableNodeType.KSAMPLER }
+            .map { it.nodeId }
+            .toSet()
         preloadModelLists()
     }
 
@@ -555,13 +563,63 @@ private class WorkflowRunScreenModel(
         executionStatus = ExecutionStatus.CONNECTING
         statusText = "正在连接..."
 
-        screenModelScope.launch {
-            wsClient.disconnect()
-            wsClient.connect(baseUrl, clientId)
+        wsEventsJob?.cancel()
+        wsStateJob?.cancel()
+
+        wsEventsJob = screenModelScope.launch {
             wsClient.events.collectLatest { msg ->
                 handleWebSocketMessage(msg.type, msg.data)
             }
         }
+
+        wsStateJob = screenModelScope.launch {
+            wsClient.connectionState.collectLatest { state ->
+                when (state.status) {
+                    WsConnectionStatus.CONNECTING -> {
+                        executionStatus = ExecutionStatus.CONNECTING
+                        statusText = "正在连接..."
+                    }
+                    WsConnectionStatus.CONNECTED -> {
+                        if (!running) {
+                            executionStatus = ExecutionStatus.IDLE
+                            statusText = "已连接"
+                        }
+                    }
+                    WsConnectionStatus.RECONNECTING -> {
+                        executionStatus = ExecutionStatus.CONNECTING
+                        statusText = "连接断开，正在重连(${state.attempt}/${state.maxAttempts})"
+                    }
+                    WsConnectionStatus.FAILED -> {
+                        executionStatus = ExecutionStatus.ERROR
+                        statusText = "重连失败（已重试${state.maxAttempts}次）"
+                    }
+                    WsConnectionStatus.DISCONNECTED -> {
+                        if (!running) {
+                            executionStatus = ExecutionStatus.IDLE
+                            statusText = "已断开"
+                        }
+                    }
+                    WsConnectionStatus.IDLE -> Unit
+                }
+            }
+        }
+
+        screenModelScope.launch {
+            wsClient.disconnect()
+            wsClient.connect(baseUrl, clientId)
+        }
+    }
+
+    fun disconnect() {
+        wsEventsJob?.cancel()
+        wsEventsJob = null
+        wsStateJob?.cancel()
+        wsStateJob = null
+        wsClient.disconnectAsync()
+    }
+
+    override fun onDispose() {
+        disconnect()
     }
     
     private fun handleWebSocketMessage(type: String, data: JsonObject?) {
