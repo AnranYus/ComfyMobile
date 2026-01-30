@@ -235,6 +235,7 @@ enum class EditableNodeType {
     VAE_LOADER,
     LORA_LOADER,
     CLIP_TEXT_ENCODE,
+    EMPTY_LATENT_IMAGE,
     OTHER
 }
 
@@ -254,6 +255,9 @@ fun detectNodeType(classType: String): EditableNodeType {
         normalized.contains("cliptextencode") || 
         normalized.contains("clip_text_encode") ||
         normalized == "clip text encode" -> EditableNodeType.CLIP_TEXT_ENCODE
+        normalized.contains("emptylatentimage") ||
+        normalized.contains("empty_latent_image") ||
+        normalized == "empty latent image" -> EditableNodeType.EMPTY_LATENT_IMAGE
         else -> EditableNodeType.OTHER
     }
 }
@@ -352,6 +356,7 @@ fun EditableNodeCard(
                                     EditableNodeType.VAE_LOADER -> "VAE"
                                     EditableNodeType.LORA_LOADER -> "LoRA"
                                     EditableNodeType.CLIP_TEXT_ENCODE -> "提示词"
+                                    EditableNodeType.EMPTY_LATENT_IMAGE -> "空潜图"
                                     else -> ""
                                 },
                                 style = MaterialTheme.typography.labelSmall,
@@ -421,6 +426,12 @@ fun EditableNodeCard(
                         }
                         EditableNodeType.CLIP_TEXT_ENCODE -> {
                             PromptEditor(
+                                inputs = inputs,
+                                onInputChange = onInputChange
+                            )
+                        }
+                        EditableNodeType.EMPTY_LATENT_IMAGE -> {
+                            EmptyLatentImageEditor(
                                 inputs = inputs,
                                 onInputChange = onInputChange
                             )
@@ -760,6 +771,83 @@ private fun formatTwoDecimals(value: Float): String {
     val whole = scaled / 100
     val fraction = kotlin.math.abs(scaled % 100)
     return "$whole.${fraction.toString().padStart(2, '0')}"
+}
+
+@Composable
+private fun EmptyLatentImageEditor(
+    inputs: Map<String, JsonElement>,
+    onInputChange: (String, JsonElement) -> Unit
+) {
+    val widthValue = inputs["width"]?.let { (it as? JsonPrimitive)?.contentOrNull } ?: ""
+    val heightValue = inputs["height"]?.let { (it as? JsonPrimitive)?.contentOrNull } ?: ""
+    val batchValue = inputs["batch_size"]?.let { (it as? JsonPrimitive)?.contentOrNull } ?: ""
+
+    Column(verticalArrangement = Arrangement.spacedBy(ComfySpacing.md)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(ComfySpacing.md)
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(ComfySpacing.xs)
+            ) {
+                Text(
+                    text = "宽度",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedTextField(
+                    value = widthValue,
+                    onValueChange = { newValue ->
+                        newValue.toIntOrNull()?.let { onInputChange("width", JsonPrimitive(it)) }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    placeholder = { Text("如 512") }
+                )
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(ComfySpacing.xs)
+            ) {
+                Text(
+                    text = "高度",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedTextField(
+                    value = heightValue,
+                    onValueChange = { newValue ->
+                        newValue.toIntOrNull()?.let { onInputChange("height", JsonPrimitive(it)) }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    placeholder = { Text("如 512") }
+                )
+            }
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(ComfySpacing.xs)) {
+            Text(
+                text = "批量",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            OutlinedTextField(
+                value = batchValue,
+                onValueChange = { newValue ->
+                    newValue.toIntOrNull()?.let { onInputChange("batch_size", JsonPrimitive(it)) }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                placeholder = { Text("如 1") }
+            )
+        }
+    }
 }
 
 @Composable
