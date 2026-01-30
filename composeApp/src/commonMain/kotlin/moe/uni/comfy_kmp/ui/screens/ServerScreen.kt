@@ -106,11 +106,6 @@ class ServerScreen : Screen {
                                 "Comfy KMP",
                                 style = MaterialTheme.typography.headlineSmall
                             )
-                            Text(
-                                text = "ComfyUI 移动客户端",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
                         }
                     },
                     actions = {
