@@ -8,13 +8,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -23,9 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -52,8 +47,7 @@ fun ImageGallery(
     images: List<GalleryImage>,
     modifier: Modifier = Modifier,
     onImageClick: ((Int) -> Unit)? = null,
-    onSaveClick: ((Int) -> Unit)? = null,
-    onSetCoverClick: ((Int) -> Unit)? = null
+    onSaveClick: ((Int) -> Unit)? = null
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         if (images.isEmpty()) {
@@ -70,8 +64,7 @@ fun ImageGallery(
                         onClick = { 
                             onImageClick?.invoke(index) 
                         },
-                        onSave = onSaveClick?.let { { it(index) } },
-                        onSetCover = onSetCoverClick?.let { { it(index) } }
+                        onSave = onSaveClick?.let { { it(index) } }
                     )
                 }
             }
@@ -83,8 +76,7 @@ fun ImageGallery(
 private fun GalleryImageItem(
     image: GalleryImage,
     onClick: () -> Unit,
-    onSave: (() -> Unit)?,
-    onSetCover: (() -> Unit)?
+    onSave: (() -> Unit)?
 ) {
     val shape = RoundedCornerShape(12.dp)
     val aspectRatio = image.bitmap?.let { it.width.toFloat() / it.height.toFloat() } ?: 1f
@@ -141,26 +133,7 @@ private fun GalleryImageItem(
             }
         }
         
-        // Action buttons
-        if (image.bitmap != null && onSetCover != null) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                FilledTonalButton(
-                    onClick = onSetCover,
-                    contentPadding = PaddingValues(horizontal = ComfySpacing.md, vertical = ComfySpacing.sm)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.PhotoLibrary,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(ComfySpacing.xs))
-                    Text("设为封面")
-                }
-            }
-        }
+        // Action buttons (reserved)
     }
 }
 

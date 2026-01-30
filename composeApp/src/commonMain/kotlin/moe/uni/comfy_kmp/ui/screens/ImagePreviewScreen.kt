@@ -7,14 +7,14 @@ import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -40,7 +40,8 @@ import org.jetbrains.compose.resources.decodeToImageBitmap
 data class ImagePreviewScreen(
     val filename: String,
     val bytes: ByteArray,
-    val onSave: (() -> Unit)? = null
+    val onSave: (() -> Unit)? = null,
+    val onSetCover: (() -> Unit)? = null
 ) : Screen {
     @Composable
     override fun Content() {
@@ -99,22 +100,44 @@ data class ImagePreviewScreen(
                 )
             }
 
-            if (onSave != null) {
-                FilledTonalIconButton(
-                    onClick = onSave,
+            if (onSave != null || onSetCover != null) {
+                Row(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(ComfySpacing.lg)
-                        .size(48.dp),
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+                        .padding(ComfySpacing.lg),
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(ComfySpacing.sm),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Save,
-                        contentDescription = "保存"
-                    )
+                    if (onSetCover != null) {
+                        FilledTonalIconButton(
+                            onClick = onSetCover,
+                            modifier = Modifier.size(48.dp),
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PhotoLibrary,
+                                contentDescription = "设为封面"
+                            )
+                        }
+                    }
+                    if (onSave != null) {
+                        FilledTonalIconButton(
+                            onClick = onSave,
+                            modifier = Modifier.size(48.dp),
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Save,
+                                contentDescription = "保存"
+                            )
+                        }
+                    }
                 }
             }
         }
