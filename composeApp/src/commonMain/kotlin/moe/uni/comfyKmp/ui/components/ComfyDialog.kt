@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -22,6 +23,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import moe.uni.comfyKmp.ui.theme.AdaptiveLayoutConstants
 import moe.uni.comfyKmp.ui.theme.ComfySpacing
 import moe.uni.comfyKmp.ui.theme.comfyColors
 
@@ -43,6 +45,7 @@ fun ComfyDialog(
     ) {
         Surface(
             modifier = Modifier
+                .widthIn(max = AdaptiveLayoutConstants.dialogMaxWidth)
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(28.dp)),
             color = MaterialTheme.comfyColors.cardBackground,
@@ -105,6 +108,7 @@ fun ComfyAlertDialog(
     Dialog(onDismissRequest = onDismissRequest) {
         Surface(
             modifier = Modifier
+                .widthIn(max = AdaptiveLayoutConstants.dialogMaxWidth)
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(28.dp)),
             color = MaterialTheme.comfyColors.cardBackground,

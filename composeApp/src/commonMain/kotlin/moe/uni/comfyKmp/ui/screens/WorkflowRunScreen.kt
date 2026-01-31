@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -93,10 +96,15 @@ import moe.uni.comfyKmp.ui.components.ExecutionStatus
 import moe.uni.comfyKmp.ui.components.ExecutionStatusBar
 import moe.uni.comfyKmp.ui.components.GalleryImage
 import moe.uni.comfyKmp.ui.components.ImageGallery
+import moe.uni.comfyKmp.ui.components.ToastHost
+import moe.uni.comfyKmp.ui.components.ToastState
 import moe.uni.comfyKmp.ui.components.detectNodeType
 import moe.uni.comfyKmp.ui.components.getModelFolder
+import moe.uni.comfyKmp.ui.components.rememberToastState
 import moe.uni.comfyKmp.ui.theme.ComfySpacing
+import moe.uni.comfyKmp.ui.theme.WindowSizeInfo
 import moe.uni.comfyKmp.ui.theme.comfyColors
+import moe.uni.comfyKmp.ui.theme.rememberWindowSizeInfo
 import org.jetbrains.compose.resources.decodeToImageBitmap
 import kotlin.random.Random
 import kotlin.time.Clock
@@ -107,13 +115,15 @@ data class WorkflowRunScreen(val workflowId: String) : Screen {
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
         val container = LocalAppContainer.current
+        val toastState = rememberToastState()
         val model = rememberScreenModel {
             WorkflowRunScreenModel(
                 workflowId = workflowId,
                 workflowRepository = container.workflowRepository,
                 apiClient = container.apiClient,
                 wsClient = container.wsClient,
-                serverRepository = container.serverRepository
+                serverRepository = container.serverRepository,
+                onToast = { toastState.show(it) }
             )
         }
 
@@ -121,131 +131,302 @@ data class WorkflowRunScreen(val workflowId: String) : Screen {
             model.connect()
         }
 
-        val scaffoldState = rememberBottomSheetScaffoldState(
-            bottomSheetState = rememberStandardBottomSheetState(
-                initialValue = SheetValue.PartiallyExpanded,
-                skipHiddenState = false
-            )
-        )
-
         val comfyColors = MaterialTheme.comfyColors
-        val sheetPeekHeight = 120.dp
 
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            val density = LocalDensity.current
-            val layoutHeightPx = with(density) { maxHeight.toPx() }
-            val peekHeightPx = with(density) { sheetPeekHeight.toPx() }
-
-            BottomSheetScaffold(
-                scaffoldState = scaffoldState,
-                sheetPeekHeight = sheetPeekHeight,
-                sheetContainerColor = comfyColors.cardBackground,
-                sheetContentColor = MaterialTheme.colorScheme.onSurface,
-                sheetShape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-                sheetDragHandle = {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Box(
-                            modifier = Modifier
-                                .width(40.dp)
-                                .height(4.dp)
-                                .clip(RoundedCornerShape(2.dp))
-                                .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "节点状态 (${model.nodeStates.size})",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-                },
-                sheetContent = {
-                    NodeListSheet(
-                        nodes = model.orderedNodeStates,
-                        randomSeedNodes = model.randomSeedNodes,
-                        modelChoices = model.modelChoices,
-                        loadingModels = model.loadingModels,
-                        onInputChange = { nodeId, field, value -> model.updateNodeInput(nodeId, field, value) },
-                        onRandomSeedToggle = { nodeId, enabled -> model.setRandomSeedMode(nodeId, enabled) },
-                        onRandomizeSeed = { nodeId -> model.randomizeSeed(nodeId) },
-                        onLoadModels = { nodeId -> model.loadModelsForNode(nodeId) },
-                        modifier = Modifier.navigationBarsPadding()
+        ToastHost(state = toastState) {
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val windowSizeInfo = rememberWindowSizeInfo(maxWidth, maxHeight)
+                
+                if (windowSizeInfo.shouldUseTwoPane) {
+                    ExpandedWorkflowRunLayout(
+                        model = model,
+                        navigator = navigator,
+                        comfyColors = comfyColors
                     )
-                },
-                topBar = {
-                    WorkflowRunTopBar(
-                        onBack = { navigator.pop() },
-                        status = model.executionStatus,
-                        statusText = model.statusText,
-                        progress = model.progress,
-                        progressText = model.progressText
-                    )
-                },
-                containerColor = MaterialTheme.colorScheme.background
-            ) { padding ->
-                val layoutDirection = LocalLayoutDirection.current
-                val startPadding = padding.calculateLeftPadding(layoutDirection)
-                val endPadding = padding.calculateRightPadding(layoutDirection)
-                val contentPadding = PaddingValues(
-                    start = startPadding,
-                    top = padding.calculateTopPadding(),
-                    end = endPadding,
-                    bottom = 0.dp
-                )
-                val sheetOffsetPx = runCatching {
-                    scaffoldState.bottomSheetState.requireOffset()
-                }.getOrElse { (layoutHeightPx - peekHeightPx).coerceAtLeast(0f) }
-                val sheetHeightPx = (layoutHeightPx - sheetOffsetPx).coerceAtLeast(0f)
-                val sheetHeightOffset = with(density) { sheetHeightPx.toDp() }
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    comfyColors.gradientStart,
-                                    comfyColors.gradientEnd
-                                )
-                            )
-                        )
-                ) {
-                    ImageGallery(
-                        images = model.galleryImages,
-                        onImageClick = { index ->
-                            model.getPreviewImage(index)?.let { preview ->
-                                navigator.push(
-                                    ImagePreviewScreen(
-                                        preview.filename,
-                                        preview.bytes,
-                                        onSave = { model.saveImage(index) },
-                                        onSetCover = { model.setCoverImage(index) }
-                                    )
-                                )
-                            }
-                        },
-                        onSaveClick = { index -> model.saveImage(index) },
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(contentPadding)
-                    )
-
-                    WorkflowRunFab(
-                        isRunning = model.running,
-                        onStart = { model.runWorkflow() },
-                        onInterrupt = { model.interrupt() },
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .navigationBarsPadding()
-                            .padding(end = ComfySpacing.lg, bottom = ComfySpacing.lg)
-                            .offset(y = -sheetHeightOffset)
+                } else {
+                    CompactWorkflowRunLayout(
+                        model = model,
+                        navigator = navigator,
+                        comfyColors = comfyColors
                     )
                 }
+            }
+        }
+    }
+}
+
+/**
+ * 小屏幕布局：底部面板
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CompactWorkflowRunLayout(
+    model: WorkflowRunScreenModel,
+    navigator: cafe.adriel.voyager.navigator.Navigator,
+    comfyColors: moe.uni.comfyKmp.ui.theme.ComfyExtendedColors
+) {
+    val scaffoldState = rememberBottomSheetScaffoldState(
+        bottomSheetState = rememberStandardBottomSheetState(
+            initialValue = SheetValue.PartiallyExpanded,
+            skipHiddenState = false
+        )
+    )
+    val sheetPeekHeight = 120.dp
+
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val density = LocalDensity.current
+        val layoutHeightPx = with(density) { maxHeight.toPx() }
+        val peekHeightPx = with(density) { sheetPeekHeight.toPx() }
+
+        BottomSheetScaffold(
+            scaffoldState = scaffoldState,
+            sheetPeekHeight = sheetPeekHeight,
+            sheetContainerColor = comfyColors.cardBackground,
+            sheetContentColor = MaterialTheme.colorScheme.onSurface,
+            sheetShape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+            sheetDragHandle = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Box(
+                        modifier = Modifier
+                            .width(40.dp)
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "节点状态 (${model.nodeStates.size})",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+            },
+            sheetContent = {
+                NodeListSheet(
+                    nodes = model.orderedNodeStates,
+                    randomSeedNodes = model.randomSeedNodes,
+                    modelChoices = model.modelChoices,
+                    loadingModels = model.loadingModels,
+                    onInputChange = { nodeId, field, value -> model.updateNodeInput(nodeId, field, value) },
+                    onRandomSeedToggle = { nodeId, enabled -> model.setRandomSeedMode(nodeId, enabled) },
+                    onRandomizeSeed = { nodeId -> model.randomizeSeed(nodeId) },
+                    onLoadModels = { nodeId -> model.loadModelsForNode(nodeId) },
+                    modifier = Modifier.navigationBarsPadding()
+                )
+            },
+            topBar = {
+                WorkflowRunTopBar(
+                    onBack = { navigator.pop() },
+                    status = model.executionStatus,
+                    statusText = model.statusText
+                )
+            },
+            containerColor = MaterialTheme.colorScheme.background
+        ) { padding ->
+            val layoutDirection = LocalLayoutDirection.current
+            val startPadding = padding.calculateLeftPadding(layoutDirection)
+            val endPadding = padding.calculateRightPadding(layoutDirection)
+            val contentPadding = PaddingValues(
+                start = startPadding,
+                top = padding.calculateTopPadding(),
+                end = endPadding,
+                bottom = 0.dp
+            )
+            val sheetOffsetPx = runCatching {
+                scaffoldState.bottomSheetState.requireOffset()
+            }.getOrElse { (layoutHeightPx - peekHeightPx).coerceAtLeast(0f) }
+            val sheetHeightPx = (layoutHeightPx - sheetOffsetPx).coerceAtLeast(0f)
+            val sheetHeightOffset = with(density) { sheetHeightPx.toDp() }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                comfyColors.gradientStart,
+                                comfyColors.gradientEnd
+                            )
+                        )
+                    )
+            ) {
+                ImageGallery(
+                    images = model.galleryImages,
+                    onImageClick = { index ->
+                        model.getPreviewImage(index)?.let { preview ->
+                            navigator.push(
+                                ImagePreviewScreen(
+                                    preview.filename,
+                                    preview.bytes,
+                                    onSave = { model.saveImage(index) },
+                                    onSetCover = { model.setCoverImage(index) }
+                                )
+                            )
+                        }
+                    },
+                    onSaveClick = { index -> model.saveImage(index) },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(contentPadding)
+                )
+
+                WorkflowRunFab(
+                    isRunning = model.running,
+                    onStart = { model.runWorkflow() },
+                    onInterrupt = { model.interrupt() },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .navigationBarsPadding()
+                        .padding(end = ComfySpacing.lg, bottom = ComfySpacing.lg)
+                        .offset(y = -sheetHeightOffset)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 大屏幕布局：左右分栏
+ * 左侧：图片预览区域
+ * 右侧：节点列表
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ExpandedWorkflowRunLayout(
+    model: WorkflowRunScreenModel,
+    navigator: cafe.adriel.voyager.navigator.Navigator,
+    comfyColors: moe.uni.comfyKmp.ui.theme.ComfyExtendedColors
+) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        // 顶部栏
+        WorkflowRunTopBar(
+            onBack = { navigator.pop() },
+            status = model.executionStatus,
+            statusText = model.statusText
+        )
+        
+        // 主内容区：左右分栏
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            comfyColors.gradientStart,
+                            comfyColors.gradientEnd
+                        )
+                    )
+                )
+        ) {
+            // 左侧：图片预览区域
+            Box(
+                modifier = Modifier
+                    .weight(0.6f)
+                    .fillMaxHeight()
+            ) {
+                ImageGallery(
+                    images = model.galleryImages,
+                    onImageClick = { index ->
+                        model.getPreviewImage(index)?.let { preview ->
+                            navigator.push(
+                                ImagePreviewScreen(
+                                    preview.filename,
+                                    preview.bytes,
+                                    onSave = { model.saveImage(index) },
+                                    onSetCover = { model.setCoverImage(index) }
+                                )
+                            )
+                        }
+                    },
+                    onSaveClick = { index -> model.saveImage(index) },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(ComfySpacing.lg)
+                )
+                
+                // FAB 放在左侧区域的右下角
+                WorkflowRunFab(
+                    isRunning = model.running,
+                    onStart = { model.runWorkflow() },
+                    onInterrupt = { model.interrupt() },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(ComfySpacing.lg)
+                )
+            }
+            
+            // 右侧：节点列表面板
+            ExpandedNodeListPanel(
+                model = model,
+                comfyColors = comfyColors,
+                modifier = Modifier
+                    .widthIn(min = 320.dp, max = 420.dp)
+                    .fillMaxHeight()
+            )
+        }
+    }
+}
+
+/**
+ * 大屏幕右侧节点列表面板
+ */
+@Composable
+private fun ExpandedNodeListPanel(
+    model: WorkflowRunScreenModel,
+    comfyColors: moe.uni.comfyKmp.ui.theme.ComfyExtendedColors,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .background(comfyColors.cardBackground)
+    ) {
+        // 面板标题
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = ComfySpacing.lg, vertical = ComfySpacing.md),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "节点状态 (${model.nodeStates.size})",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+        
+        // 节点列表
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = ComfySpacing.lg,
+                end = ComfySpacing.lg,
+                bottom = ComfySpacing.xl
+            ),
+            verticalArrangement = Arrangement.spacedBy(ComfySpacing.md)
+        ) {
+            items(model.orderedNodeStates, key = { it.nodeId }) { node ->
+                EditableNodeCard(
+                    nodeId = node.nodeId,
+                    classType = node.classType,
+                    status = node.status,
+                    inputs = node.inputs,
+                    isRandomSeedEnabled = model.randomSeedNodes.contains(node.nodeId),
+                    modelOptions = model.modelChoices[node.nodeId] ?: emptyList(),
+                    isLoadingModels = model.loadingModels.contains(node.nodeId),
+                    onInputChange = { field, value -> 
+                        model.updateNodeInput(node.nodeId, field, value) 
+                    },
+                    onRandomSeedToggle = { enabled -> 
+                        model.setRandomSeedMode(node.nodeId, enabled) 
+                    },
+                    onRandomizeSeed = { model.randomizeSeed(node.nodeId) },
+                    onLoadModels = { model.loadModelsForNode(node.nodeId) }
+                )
             }
         }
     }
@@ -261,9 +442,7 @@ private data class PreviewImage(
 private fun WorkflowRunTopBar(
     onBack: () -> Unit,
     status: ExecutionStatus,
-    statusText: String,
-    progress: Float?,
-    progressText: String?
+    statusText: String
 ) {
     Column(
         modifier = Modifier
@@ -287,9 +466,7 @@ private fun WorkflowRunTopBar(
         
         ExecutionStatusBar(
             status = status,
-            statusText = statusText,
-            progress = progress,
-            progressText = progressText
+            statusText = statusText
         )
     }
 }
@@ -383,7 +560,8 @@ private class WorkflowRunScreenModel(
     private val workflowRepository: WorkflowRepository,
     private val apiClient: ComfyApiClient,
     private val wsClient: ComfyWebSocketClient,
-    private val serverRepository: ServerRepository
+    private val serverRepository: ServerRepository,
+    private val onToast: (String) -> Unit = {}
 ) : ScreenModel {
     private var workflow = workflowRepository.getWorkflow(workflowId)
     private val server = workflow?.let { serverRepository.getServers().firstOrNull { s -> s.id == it.serverId } }
@@ -814,9 +992,9 @@ private class WorkflowRunScreenModel(
         screenModelScope.launch {
             try {
                 val location = saveImageToGallery(bytes, ref.filename)
-                statusText = "已保存: $location"
+                onToast("已保存: $location")
             } catch (e: Exception) {
-                statusText = "保存失败: ${e.message}"
+                onToast("保存失败: ${e.message}")
             }
         }
     }
@@ -834,7 +1012,7 @@ private class WorkflowRunScreenModel(
         )
         workflowRepository.upsertWorkflow(updated)
         workflow = updated
-        statusText = "已设置为封面"
+        onToast("已设置为封面")
     }
 
     private fun updateNodeStatus(nodeId: String, status: NodeStatus) {

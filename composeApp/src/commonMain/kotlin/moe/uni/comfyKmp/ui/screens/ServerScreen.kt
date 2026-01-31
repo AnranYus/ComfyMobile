@@ -9,16 +9,19 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -68,8 +71,10 @@ import moe.uni.comfyKmp.di.LocalAppContainer
 import moe.uni.comfyKmp.storage.generateId
 import moe.uni.comfyKmp.ui.components.ComfyDialog
 import moe.uni.comfyKmp.ui.components.GlassCard
+import moe.uni.comfyKmp.ui.theme.AdaptiveLayoutConstants
 import moe.uni.comfyKmp.ui.theme.ComfySpacing
 import moe.uni.comfyKmp.ui.theme.comfyColors
+import moe.uni.comfyKmp.ui.theme.rememberWindowSizeInfo
 
 class ServerScreen : Screen {
     @Composable
@@ -80,6 +85,7 @@ class ServerScreen : Screen {
 
         var showDialog by remember { mutableStateOf(false) }
         var editingServer by remember { mutableStateOf<ServerConfig?>(null) }
+        var selectedServerId by remember { mutableStateOf<String?>(null) }
 
         if (showDialog) {
             ServerEditDialog(
@@ -95,128 +101,204 @@ class ServerScreen : Screen {
 
         val comfyColors = MaterialTheme.comfyColors
 
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { 
-                        Column {
-                            Text(
-                                "Comfy KMP",
-                                style = MaterialTheme.typography.headlineSmall
-                            )
-                        }
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val windowSizeInfo = rememberWindowSizeInfo(maxWidth, maxHeight)
+            
+            if (windowSizeInfo.shouldUseTwoPane) {
+                // 大屏幕：双面板布局
+                ExpandedServerLayout(
+                    model = model,
+                    navigator = navigator,
+                    comfyColors = comfyColors,
+                    selectedServerId = selectedServerId,
+                    onServerSelect = { selectedServerId = it },
+                    onAddServer = {
+                        editingServer = null
+                        showDialog = true
                     },
-                    actions = {
-                        FilledTonalButton(
-                            onClick = {
-                                editingServer = null
-                                showDialog = true
-                            },
-                            modifier = Modifier.padding(end = ComfySpacing.sm)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(ComfySpacing.xs))
-                            Text("添加服务器")
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    )
-                )
-            },
-            floatingActionButton = {
-                val canEnter = model.activeServerId != null
-                ExtendedFloatingActionButton(
-                    onClick = {
-                        val activeId = model.activeServerId ?: return@ExtendedFloatingActionButton
-                        navigator.push(WorkflowListScreen(activeId))
-                    },
-                    icon = {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    },
-                    text = { Text("进入工作流") },
-                    containerColor = if (canEnter) {
-                        MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.surfaceVariant
-                    },
-                    contentColor = if (canEnter) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
+                    onEditServer = { server ->
+                        editingServer = server
+                        showDialog = true
                     }
                 )
-            },
-            floatingActionButtonPosition = FabPosition.End,
-            containerColor = MaterialTheme.colorScheme.background
-        ) { padding ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                comfyColors.gradientStart,
-                                comfyColors.gradientEnd
-                            )
-                        )
-                    )
-            ) {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    if (model.servers.isEmpty()) {
-                        EmptyServerState(
-                            onAdd = {
-                                editingServer = null
-                                showDialog = true
-                            },
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxWidth()
-                        )
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(ComfySpacing.lg),
-                            verticalArrangement = Arrangement.spacedBy(ComfySpacing.md)
-                        ) {
-                            itemsIndexed(
-                                items = model.servers,
-                                key = { _, server -> server.id }
-                            ) { index, server ->
-                                AnimatedVisibility(
-                                    visible = true,
-                                    enter = fadeIn(tween(300, delayMillis = index * 50)) +
-                                            slideInVertically(
-                                                initialOffsetY = { it / 2 },
-                                                animationSpec = tween(300, delayMillis = index * 50)
-                                            )
-                                ) {
-                                    ServerCard(
-                                        server = server,
-                                        isActive = server.id == model.activeServerId,
-                                        onSelect = { model.setActive(server.id) },
-                                        onEdit = {
-                                            editingServer = server
-                                            showDialog = true
-                                        },
-                                        onDelete = { model.delete(server.id) }
-                                    )
-                                }
-                            }
-                        }
+            } else {
+                // 小屏幕：单面板布局
+                CompactServerLayout(
+                    model = model,
+                    navigator = navigator,
+                    comfyColors = comfyColors,
+                    onAddServer = {
+                        editingServer = null
+                        showDialog = true
+                    },
+                    onEditServer = { server ->
+                        editingServer = server
+                        showDialog = true
                     }
-                }
+                )
             }
         }
+    }
+}
+
+/**
+ * 小屏幕布局：单面板
+ */
+@Composable
+private fun CompactServerLayout(
+    model: ServerScreenModel,
+    navigator: cafe.adriel.voyager.navigator.Navigator,
+    comfyColors: moe.uni.comfyKmp.ui.theme.ComfyExtendedColors,
+    onAddServer: () -> Unit,
+    onEditServer: (ServerConfig) -> Unit
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { 
+                    Column {
+                        Text(
+                            "Comfy KMP",
+                            style = MaterialTheme.typography.headlineSmall
+                        )
+                    }
+                },
+                actions = {
+                    FilledTonalButton(
+                        onClick = onAddServer,
+                        modifier = Modifier.padding(end = ComfySpacing.sm)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(ComfySpacing.xs))
+                        Text("添加服务器")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            )
+        },
+        floatingActionButton = {
+            val canEnter = model.activeServerId != null
+            ExtendedFloatingActionButton(
+                onClick = {
+                    val activeId = model.activeServerId ?: return@ExtendedFloatingActionButton
+                    navigator.push(WorkflowListScreen(activeId))
+                },
+                icon = {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                },
+                text = { Text("进入工作流") },
+                containerColor = if (canEnter) {
+                    MaterialTheme.colorScheme.primaryContainer
+                } else {
+                    MaterialTheme.colorScheme.surfaceVariant
+                },
+                contentColor = if (canEnter) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
+        },
+        floatingActionButtonPosition = FabPosition.End,
+        containerColor = MaterialTheme.colorScheme.background
+    ) { padding ->
+        ServerListContent(
+            model = model,
+            comfyColors = comfyColors,
+            onAddServer = onAddServer,
+            onEditServer = onEditServer,
+            modifier = Modifier.padding(padding)
+        )
+    }
+}
+
+/**
+ * 大屏幕布局：双面板
+ */
+@Composable
+private fun ExpandedServerLayout(
+    model: ServerScreenModel,
+    navigator: cafe.adriel.voyager.navigator.Navigator,
+    comfyColors: moe.uni.comfyKmp.ui.theme.ComfyExtendedColors,
+    selectedServerId: String?,
+    onServerSelect: (String?) -> Unit,
+    onAddServer: () -> Unit,
+    onEditServer: (ServerConfig) -> Unit
+) {
+    val selectedServer = model.servers.find { it.id == selectedServerId }
+    
+    Row(modifier = Modifier.fillMaxSize()) {
+        // 左侧：服务器列表
+        Column(
+            modifier = Modifier
+                .widthIn(
+                    min = AdaptiveLayoutConstants.listPaneMinWidth,
+                    max = AdaptiveLayoutConstants.listPaneMaxWidth
+                )
+                .fillMaxHeight()
+        ) {
+            // 顶部栏
+            TopAppBar(
+                title = { 
+                    Text("Comfy KMP", style = MaterialTheme.typography.headlineSmall)
+                },
+                actions = {
+                    FilledTonalButton(
+                        onClick = onAddServer,
+                        modifier = Modifier.padding(end = ComfySpacing.sm)
+                    ) {
+                        Icon(Icons.Default.Add, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(ComfySpacing.xs))
+                        Text("添加")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            )
+            
+            // 服务器列表
+            ServerListContent(
+                model = model,
+                comfyColors = comfyColors,
+                onAddServer = onAddServer,
+                onEditServer = onEditServer,
+                selectedServerId = selectedServerId,
+                onServerClick = { onServerSelect(it) },
+                modifier = Modifier.weight(1f)
+            )
+        }
+        
+        // 右侧：详情面板
+        ServerDetailPanel(
+            server = selectedServer,
+            isActive = selectedServer?.id == model.activeServerId,
+            comfyColors = comfyColors,
+            onSelect = { selectedServer?.let { model.setActive(it.id) } },
+            onEdit = { selectedServer?.let { onEditServer(it) } },
+            onDelete = { 
+                selectedServer?.let { 
+                    model.delete(it.id)
+                    onServerSelect(null)
+                }
+            },
+            onEnterWorkflow = {
+                val activeId = model.activeServerId ?: return@ServerDetailPanel
+                navigator.push(WorkflowListScreen(activeId))
+            },
+            canEnterWorkflow = model.activeServerId != null,
+            modifier = Modifier.weight(1f).fillMaxHeight()
+        )
     }
 }
 
@@ -246,6 +328,233 @@ private class ServerScreenModel(
     fun setActive(serverId: String) {
         repository.setActiveServer(serverId)
         activeServerId = serverId
+    }
+}
+
+/**
+ * 服务器列表内容（可复用）
+ */
+@Composable
+private fun ServerListContent(
+    model: ServerScreenModel,
+    comfyColors: moe.uni.comfyKmp.ui.theme.ComfyExtendedColors,
+    onAddServer: () -> Unit,
+    onEditServer: (ServerConfig) -> Unit,
+    modifier: Modifier = Modifier,
+    selectedServerId: String? = null,
+    onServerClick: ((String) -> Unit)? = null
+) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        comfyColors.gradientStart,
+                        comfyColors.gradientEnd
+                    )
+                )
+            )
+    ) {
+        if (model.servers.isEmpty()) {
+            EmptyServerState(
+                onAdd = onAddServer,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            LazyColumn(
+                contentPadding = PaddingValues(ComfySpacing.lg),
+                verticalArrangement = Arrangement.spacedBy(ComfySpacing.md)
+            ) {
+                itemsIndexed(
+                    items = model.servers,
+                    key = { _, server -> server.id }
+                ) { index, server ->
+                    AnimatedVisibility(
+                        visible = true,
+                        enter = fadeIn(tween(300, delayMillis = index * 50)) +
+                                slideInVertically(
+                                    initialOffsetY = { it / 2 },
+                                    animationSpec = tween(300, delayMillis = index * 50)
+                                )
+                    ) {
+                        ServerCard(
+                            server = server,
+                            isActive = server.id == model.activeServerId,
+                            isSelected = server.id == selectedServerId,
+                            onSelect = { 
+                                model.setActive(server.id)
+                                onServerClick?.invoke(server.id)
+                            },
+                            onEdit = { onEditServer(server) },
+                            onDelete = { model.delete(server.id) },
+                            showActions = onServerClick == null
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 大屏幕右侧详情面板
+ */
+@Composable
+private fun ServerDetailPanel(
+    server: ServerConfig?,
+    isActive: Boolean,
+    comfyColors: moe.uni.comfyKmp.ui.theme.ComfyExtendedColors,
+    onSelect: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onEnterWorkflow: () -> Unit,
+    canEnterWorkflow: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .background(comfyColors.cardBackground)
+            .padding(ComfySpacing.xl),
+        contentAlignment = Alignment.Center
+    ) {
+        if (server == null) {
+            // 未选择服务器时的占位内容
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Dns,
+                    contentDescription = null,
+                    modifier = Modifier.size(72.dp),
+                    tint = MaterialTheme.colorScheme.outline
+                )
+                Spacer(Modifier.height(ComfySpacing.lg))
+                Text(
+                    "选择一个服务器查看详情",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            // 显示服务器详情
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Spacer(Modifier.weight(1f))
+                
+                // 服务器图标
+                Box(
+                    modifier = Modifier
+                        .size(96.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (isActive) MaterialTheme.colorScheme.primaryContainer
+                            else MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Dns,
+                        contentDescription = null,
+                        modifier = Modifier.size(48.dp),
+                        tint = if (isActive) MaterialTheme.colorScheme.onPrimaryContainer
+                               else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                
+                Spacer(Modifier.height(ComfySpacing.xl))
+                
+                // 服务器名称
+                Text(
+                    text = server.name,
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                
+                Spacer(Modifier.height(ComfySpacing.sm))
+                
+                // 服务器地址
+                Text(
+                    text = server.baseUrl,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                if (server.isDefault) {
+                    Spacer(Modifier.height(ComfySpacing.md))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.primaryContainer)
+                            .padding(horizontal = ComfySpacing.md, vertical = ComfySpacing.sm)
+                    ) {
+                        Text(
+                            "默认服务器",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+                
+                Spacer(Modifier.height(ComfySpacing.xxl))
+                
+                // 操作按钮
+                Row(horizontalArrangement = Arrangement.spacedBy(ComfySpacing.md)) {
+                    OutlinedButton(
+                        onClick = onSelect,
+                        enabled = !isActive
+                    ) {
+                        Icon(
+                            if (isActive) Icons.Default.Check else Icons.Default.RadioButtonUnchecked,
+                            null, Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(ComfySpacing.sm))
+                        Text(if (isActive) "已选择" else "选择")
+                    }
+                    
+                    OutlinedButton(onClick = onEdit) {
+                        Icon(Icons.Default.Edit, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(ComfySpacing.sm))
+                        Text("编辑")
+                    }
+                    
+                    OutlinedButton(
+                        onClick = onDelete,
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Icon(Icons.Default.Delete, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(ComfySpacing.sm))
+                        Text("删除")
+                    }
+                }
+                
+                Spacer(Modifier.weight(1f))
+                
+                // 进入工作流按钮
+                ExtendedFloatingActionButton(
+                    onClick = onEnterWorkflow,
+                    icon = {
+                        Icon(Icons.AutoMirrored.Filled.ArrowForward, null, Modifier.size(20.dp))
+                    },
+                    text = { Text("进入工作流") },
+                    containerColor = if (canEnterWorkflow) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant
+                    },
+                    contentColor = if (canEnterWorkflow) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                )
+            }
+        }
     }
 }
 
@@ -321,7 +630,9 @@ private fun ServerCard(
     isActive: Boolean,
     onSelect: () -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    isSelected: Boolean = false,
+    showActions: Boolean = true
 ) {
     GlassCard(
         modifier = Modifier.fillMaxWidth(),
@@ -386,58 +697,60 @@ private fun ServerCard(
                 }
             }
             
-            // Actions
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(ComfySpacing.sm)
-            ) {
-                OutlinedButton(
-                    onClick = onSelect,
-                    enabled = !isActive,
-                    contentPadding = PaddingValues(
-                        horizontal = ComfySpacing.md,
-                        vertical = ComfySpacing.sm
-                    )
+            // Actions - 仅在小屏幕模式下显示
+            if (showActions) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(ComfySpacing.sm)
                 ) {
-                    Icon(
-                        imageVector = if (isActive) Icons.Default.Check else Icons.Default.RadioButtonUnchecked,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(ComfySpacing.xs))
-                    Text(if (isActive) "已选择" else "选择")
-                }
-                
-                OutlinedButton(
-                    onClick = onEdit,
-                    contentPadding = PaddingValues(
-                        horizontal = ComfySpacing.md,
-                        vertical = ComfySpacing.sm
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(ComfySpacing.xs))
-                    Text("编辑")
-                }
-                
-                Spacer(modifier = Modifier.weight(1f))
-                
-                TextButton(
-                    onClick = onDelete,
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(ComfySpacing.xs))
-                    Text("删除")
+                    OutlinedButton(
+                        onClick = onSelect,
+                        enabled = !isActive,
+                        contentPadding = PaddingValues(
+                            horizontal = ComfySpacing.md,
+                            vertical = ComfySpacing.sm
+                        )
+                    ) {
+                        Icon(
+                            imageVector = if (isActive) Icons.Default.Check else Icons.Default.RadioButtonUnchecked,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(ComfySpacing.xs))
+                        Text(if (isActive) "已选择" else "选择")
+                    }
+                    
+                    OutlinedButton(
+                        onClick = onEdit,
+                        contentPadding = PaddingValues(
+                            horizontal = ComfySpacing.md,
+                            vertical = ComfySpacing.sm
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(ComfySpacing.xs))
+                        Text("编辑")
+                    }
+                    
+                    Spacer(modifier = Modifier.weight(1f))
+                    
+                    TextButton(
+                        onClick = onDelete,
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(ComfySpacing.xs))
+                        Text("删除")
+                    }
                 }
             }
         }
