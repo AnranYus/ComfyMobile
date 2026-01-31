@@ -6,21 +6,28 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-fun extractImagesFromHistory(history: JsonElement): List<ImageRef> {
-    val result = mutableListOf<ImageRef>()
+/**
+ * Extract images from history with their associated node IDs
+ */
+fun extractImagesFromHistoryWithNodeId(history: JsonElement): List<NodeImageRef> {
+    val result = mutableListOf<NodeImageRef>()
     val root = history as? JsonObject ?: return emptyList()
     root.values.forEach { promptEntry ->
         val outputs = promptEntry.jsonObject["outputs"]?.jsonObject ?: return@forEach
-        outputs.values.forEach { nodeOutput ->
+        outputs.forEach { (nodeId, nodeOutput) ->
             val images = nodeOutput.jsonObject["images"] as? JsonArray ?: return@forEach
             images.forEach { img ->
                 val obj = img.jsonObject
                 val filename = obj["filename"]?.jsonPrimitive?.content ?: return@forEach
                 val subfolder = obj["subfolder"]?.jsonPrimitive?.content
                 val type = obj["type"]?.jsonPrimitive?.content
-                result.add(ImageRef(filename, subfolder, type))
+                result.add(NodeImageRef(nodeId, ImageRef(filename, subfolder, type)))
             }
         }
     }
     return result
+}
+
+fun extractImagesFromHistory(history: JsonElement): List<ImageRef> {
+    return extractImagesFromHistoryWithNodeId(history).map { it.imageRef }
 }

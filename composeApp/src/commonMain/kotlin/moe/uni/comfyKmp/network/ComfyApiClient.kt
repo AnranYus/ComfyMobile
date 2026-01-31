@@ -3,13 +3,18 @@ package moe.uni.comfyKmp.network
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.delete
+import io.ktor.client.request.forms.formData
+import io.ktor.client.request.forms.submitFormWithBinaryData
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
+import io.ktor.http.Headers
+import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import moe.uni.comfyKmp.data.ImageUploadResponse
 import moe.uni.comfyKmp.data.PromptRequest
 import moe.uni.comfyKmp.data.PromptResponse
 
@@ -68,5 +73,24 @@ class ComfyApiClient(
 
     suspend fun getBytes(url: String): ByteArray {
         return httpClient.get(url).body()
+    }
+
+    suspend fun uploadImage(
+        baseUrl: String,
+        filename: String,
+        bytes: ByteArray,
+        mimeType: String = "image/png",
+        overwrite: Boolean = true
+    ): ImageUploadResponse {
+        return httpClient.submitFormWithBinaryData(
+            url = "${baseUrl.trimEnd('/')}/upload/image",
+            formData = formData {
+                append("image", bytes, Headers.build {
+                    append(HttpHeaders.ContentType, mimeType)
+                    append(HttpHeaders.ContentDisposition, "filename=\"$filename\"")
+                })
+                append("overwrite", overwrite.toString())
+            }
+        ).body()
     }
 }

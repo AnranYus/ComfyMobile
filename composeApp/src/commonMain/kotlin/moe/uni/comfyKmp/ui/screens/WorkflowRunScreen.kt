@@ -45,6 +45,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,15 +76,18 @@ import kotlinx.serialization.json.jsonPrimitive
 import moe.uni.comfyKmp.data.ComfyJson
 import moe.uni.comfyKmp.data.ImageRef
 import moe.uni.comfyKmp.data.NodeExecutionState
+import moe.uni.comfyKmp.data.NodeImageRef
 import moe.uni.comfyKmp.data.NodeStatus
 import moe.uni.comfyKmp.data.PromptRequest
-import moe.uni.comfyKmp.data.extractImagesFromHistory
+import moe.uni.comfyKmp.data.extractImagesFromHistoryWithNodeId
 import moe.uni.comfyKmp.data.extractPromptObject
 import moe.uni.comfyKmp.data.parsePromptNodes
 import moe.uni.comfyKmp.data.saveCoverImage
 import moe.uni.comfyKmp.data.saveImageToGallery
 import moe.uni.comfyKmp.data.updateNodeInput
 import moe.uni.comfyKmp.di.LocalAppContainer
+import moe.uni.comfyKmp.PickedImage
+import moe.uni.comfyKmp.rememberImagePickerLauncher
 import moe.uni.comfyKmp.network.ComfyApiClient
 import moe.uni.comfyKmp.network.ComfyWebSocketClient
 import moe.uni.comfyKmp.network.WsConnectionStatus
@@ -173,6 +177,17 @@ private fun CompactWorkflowRunLayout(
     )
     val sheetPeekHeight = 120.dp
 
+    // Image picker state
+    var pendingImageNodeId by remember { mutableStateOf<String?>(null) }
+    val launchImagePicker = rememberImagePickerLauncher { pickedImage ->
+        pendingImageNodeId?.let { nodeId ->
+            if (pickedImage != null) {
+                model.onImageSelected(nodeId, pickedImage)
+            }
+        }
+        pendingImageNodeId = null
+    }
+
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val density = LocalDensity.current
         val layoutHeightPx = with(density) { maxHeight.toPx() }
@@ -212,10 +227,18 @@ private fun CompactWorkflowRunLayout(
                     randomSeedNodes = model.randomSeedNodes,
                     modelChoices = model.modelChoices,
                     loadingModels = model.loadingModels,
+                    uploadingImageNodes = model.uploadingImageNodes,
+                    uploadedImagePreviews = model.uploadedImagePreviews,
+                    nodeOutputPreviews = model.nodeOutputPreviews,
+                    isLoadingNodeOutputs = model.running,
                     onInputChange = { nodeId, field, value -> model.updateNodeInput(nodeId, field, value) },
                     onRandomSeedToggle = { nodeId, enabled -> model.setRandomSeedMode(nodeId, enabled) },
                     onRandomizeSeed = { nodeId -> model.randomizeSeed(nodeId) },
                     onLoadModels = { nodeId -> model.loadModelsForNode(nodeId) },
+                    onSelectImage = { nodeId ->
+                        pendingImageNodeId = nodeId
+                        launchImagePicker()
+                    },
                     modifier = Modifier.navigationBarsPadding()
                 )
             },
@@ -381,6 +404,17 @@ private fun ExpandedNodeListPanel(
     comfyColors: moe.uni.comfyKmp.ui.theme.ComfyExtendedColors,
     modifier: Modifier = Modifier
 ) {
+    // Image picker state
+    var pendingImageNodeId by remember { mutableStateOf<String?>(null) }
+    val launchImagePicker = rememberImagePickerLauncher { pickedImage ->
+        pendingImageNodeId?.let { nodeId ->
+            if (pickedImage != null) {
+                model.onImageSelected(nodeId, pickedImage)
+            }
+        }
+        pendingImageNodeId = null
+    }
+
     Column(
         modifier = modifier
             .background(comfyColors.cardBackground)
@@ -418,6 +452,10 @@ private fun ExpandedNodeListPanel(
                     isRandomSeedEnabled = model.randomSeedNodes.contains(node.nodeId),
                     modelOptions = model.modelChoices[node.nodeId] ?: emptyList(),
                     isLoadingModels = model.loadingModels.contains(node.nodeId),
+                    imagePreview = model.uploadedImagePreviews[node.nodeId],
+                    isUploadingImage = model.uploadingImageNodes.contains(node.nodeId),
+                    nodeOutputPreview = model.nodeOutputPreviews[node.nodeId],
+                    isLoadingNodeOutput = model.running && model.nodeOutputPreviews[node.nodeId] == null,
                     onInputChange = { field, value -> 
                         model.updateNodeInput(node.nodeId, field, value) 
                     },
@@ -425,7 +463,11 @@ private fun ExpandedNodeListPanel(
                         model.setRandomSeedMode(node.nodeId, enabled) 
                     },
                     onRandomizeSeed = { model.randomizeSeed(node.nodeId) },
-                    onLoadModels = { model.loadModelsForNode(node.nodeId) }
+                    onLoadModels = { model.loadModelsForNode(node.nodeId) },
+                    onSelectImage = {
+                        pendingImageNodeId = node.nodeId
+                        launchImagePicker()
+                    }
                 )
             }
         }
@@ -522,10 +564,15 @@ private fun NodeListSheet(
     randomSeedNodes: Set<String>,
     modelChoices: Map<String, List<String>>,
     loadingModels: Set<String>,
+    uploadingImageNodes: Set<String>,
+    uploadedImagePreviews: Map<String, ImageBitmap>,
+    nodeOutputPreviews: Map<String, ImageBitmap>,
+    isLoadingNodeOutputs: Boolean,
     onInputChange: (nodeId: String, field: String, value: JsonElement) -> Unit,
     onRandomSeedToggle: (nodeId: String, enabled: Boolean) -> Unit,
     onRandomizeSeed: (nodeId: String) -> Unit,
     onLoadModels: (nodeId: String) -> Unit,
+    onSelectImage: (nodeId: String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -546,10 +593,15 @@ private fun NodeListSheet(
                 isRandomSeedEnabled = randomSeedNodes.contains(node.nodeId),
                 modelOptions = modelChoices[node.nodeId] ?: emptyList(),
                 isLoadingModels = loadingModels.contains(node.nodeId),
+                imagePreview = uploadedImagePreviews[node.nodeId],
+                isUploadingImage = uploadingImageNodes.contains(node.nodeId),
+                nodeOutputPreview = nodeOutputPreviews[node.nodeId],
+                isLoadingNodeOutput = isLoadingNodeOutputs && nodeOutputPreviews[node.nodeId] == null,
                 onInputChange = { field, value -> onInputChange(node.nodeId, field, value) },
                 onRandomSeedToggle = { enabled -> onRandomSeedToggle(node.nodeId, enabled) },
                 onRandomizeSeed = { onRandomizeSeed(node.nodeId) },
-                onLoadModels = { onLoadModels(node.nodeId) }
+                onLoadModels = { onLoadModels(node.nodeId) },
+                onSelectImage = { onSelectImage(node.nodeId) }
             )
         }
     }
@@ -597,8 +649,18 @@ private class WorkflowRunScreenModel(
     var loadingModels by mutableStateOf<Set<String>>(emptySet())
         private set
     
+    // Image upload state
+    var uploadingImageNodes by mutableStateOf<Set<String>>(emptySet())
+        private set
+    var uploadedImagePreviews by mutableStateOf<Map<String, ImageBitmap>>(emptyMap())
+        private set
+    
+    // Node output preview images (for PreviewImage nodes)
+    var nodeOutputPreviews by mutableStateOf<Map<String, ImageBitmap>>(emptyMap())
+        private set
+    
     private var promptId by mutableStateOf<String?>(null)
-    private var imageRefs by mutableStateOf<List<ImageRef>>(emptyList())
+    private var nodeImageRefs by mutableStateOf<List<NodeImageRef>>(emptyList())
     private var imageBitmaps by mutableStateOf<Map<String, ImageBitmap>>(emptyMap())
     private var imageBytes by mutableStateOf<Map<String, ByteArray>>(emptyMap())
     private var isLoadingImages by mutableStateOf(false)
@@ -607,12 +669,23 @@ private class WorkflowRunScreenModel(
     private var wsStateJob: Job? = null
     
     val galleryImages: List<GalleryImage>
-        get() = imageRefs.map { ref ->
-            GalleryImage(
-                filename = ref.filename,
-                bitmap = imageBitmaps[ref.filename],
-                isLoading = isLoadingImages && !imageBitmaps.containsKey(ref.filename)
-            )
+        get() {
+            // Filter out PreviewImage nodes, only show SaveImage outputs in gallery
+            val previewNodeIds = nodeStates
+                .filter { detectNodeType(it.classType) == EditableNodeType.PREVIEW_IMAGE }
+                .map { it.nodeId }
+                .toSet()
+            
+            return nodeImageRefs
+                .filter { it.nodeId !in previewNodeIds }
+                .map { nodeRef ->
+                    val ref = nodeRef.imageRef
+                    GalleryImage(
+                        filename = ref.filename,
+                        bitmap = imageBitmaps[ref.filename],
+                        isLoading = isLoadingImages && !imageBitmaps.containsKey(ref.filename)
+                    )
+                }
         }
 
     val orderedNodeStates: List<NodeExecutionState>
@@ -634,7 +707,8 @@ private class WorkflowRunScreenModel(
     }
 
     fun getPreviewImage(index: Int): PreviewImage? {
-        val ref = imageRefs.getOrNull(index) ?: return null
+        val galleryRefs = getGalleryImageRefs()
+        val ref = galleryRefs.getOrNull(index) ?: return null
         val bytes = imageBytes[ref.filename] ?: return null
         return PreviewImage(ref.filename, bytes)
     }
@@ -706,6 +780,30 @@ private class WorkflowRunScreenModel(
             getModelFolder(detectNodeType(node.classType)) != null
         }.map { it.nodeId }
         modelNodeIds.forEach { loadModelsForNode(it) }
+    }
+
+    fun onImageSelected(nodeId: String, pickedImage: PickedImage) {
+        screenModelScope.launch {
+            uploadingImageNodes = uploadingImageNodes + nodeId
+            try {
+                val response = apiClient.uploadImage(
+                    baseUrl = baseUrl,
+                    filename = pickedImage.filename,
+                    bytes = pickedImage.bytes,
+                    mimeType = pickedImage.mimeType
+                )
+                
+                updateNodeInput(nodeId, "image", JsonPrimitive(response.name))
+                
+                val bitmap = pickedImage.bytes.decodeToImageBitmap()
+                uploadedImagePreviews = uploadedImagePreviews + (nodeId to bitmap)
+                
+            } catch (e: Exception) {
+                onToast("图片上传失败: ${e.message}")
+            } finally {
+                uploadingImageNodes = uploadingImageNodes - nodeId
+            }
+        }
     }
     
     private fun scheduleSave() {
@@ -947,9 +1045,9 @@ private class WorkflowRunScreenModel(
         screenModelScope.launch {
             try {
                 val history = apiClient.getHistory(baseUrl, id)
-                val newRefs = extractImagesFromHistory(history)
-                if (newRefs.isNotEmpty() && newRefs != imageRefs) {
-                    imageRefs = newRefs
+                val newRefs = extractImagesFromHistoryWithNodeId(history)
+                if (newRefs.isNotEmpty() && newRefs != nodeImageRefs) {
+                    nodeImageRefs = newRefs
                     loadImages()
                 }
             } catch (e: Exception) {
@@ -960,7 +1058,15 @@ private class WorkflowRunScreenModel(
     
     private fun loadImages() {
         isLoadingImages = true
-        imageRefs.forEach { ref ->
+        
+        // Get PreviewImage node IDs
+        val previewNodeIds = nodeStates
+            .filter { detectNodeType(it.classType) == EditableNodeType.PREVIEW_IMAGE }
+            .map { it.nodeId }
+            .toSet()
+        
+        nodeImageRefs.forEach { nodeRef ->
+            val ref = nodeRef.imageRef
             if (!imageBitmaps.containsKey(ref.filename)) {
                 screenModelScope.launch {
                     try {
@@ -969,11 +1075,16 @@ private class WorkflowRunScreenModel(
                         imageBytes = imageBytes + (ref.filename to bytes)
                         val bitmap = bytes.decodeToImageBitmap()
                         imageBitmaps = imageBitmaps + (ref.filename to bitmap)
+                        
+                        // If this is a PreviewImage node, update nodeOutputPreviews
+                        if (nodeRef.nodeId in previewNodeIds) {
+                            nodeOutputPreviews = nodeOutputPreviews + (nodeRef.nodeId to bitmap)
+                        }
                     } catch (e: Exception) {
                         // Image loading failed
                     } finally {
                         // Check if all images are loaded
-                        if (imageBitmaps.size >= imageRefs.size) {
+                        if (imageBitmaps.size >= nodeImageRefs.size) {
                             isLoadingImages = false
                         }
                     }
@@ -981,13 +1092,14 @@ private class WorkflowRunScreenModel(
             }
         }
         // If all images are already cached
-        if (imageRefs.all { imageBitmaps.containsKey(it.filename) }) {
+        if (nodeImageRefs.all { imageBitmaps.containsKey(it.imageRef.filename) }) {
             isLoadingImages = false
         }
     }
     
     fun saveImage(index: Int) {
-        val ref = imageRefs.getOrNull(index) ?: return
+        val galleryRefs = getGalleryImageRefs()
+        val ref = galleryRefs.getOrNull(index) ?: return
         val bytes = imageBytes[ref.filename] ?: return
         screenModelScope.launch {
             try {
@@ -1000,7 +1112,8 @@ private class WorkflowRunScreenModel(
     }
     
     fun setCoverImage(index: Int) {
-        val ref = imageRefs.getOrNull(index) ?: return
+        val galleryRefs = getGalleryImageRefs()
+        val ref = galleryRefs.getOrNull(index) ?: return
         val bytes = imageBytes[ref.filename] ?: return
         val current = workflow ?: return
         
@@ -1013,6 +1126,16 @@ private class WorkflowRunScreenModel(
         workflowRepository.upsertWorkflow(updated)
         workflow = updated
         onToast("已设置为封面")
+    }
+    
+    private fun getGalleryImageRefs(): List<ImageRef> {
+        val previewNodeIds = nodeStates
+            .filter { detectNodeType(it.classType) == EditableNodeType.PREVIEW_IMAGE }
+            .map { it.nodeId }
+            .toSet()
+        return nodeImageRefs
+            .filter { it.nodeId !in previewNodeIds }
+            .map { it.imageRef }
     }
 
     private fun updateNodeStatus(nodeId: String, status: NodeStatus) {

@@ -50,6 +50,21 @@ data class ImageRef(
     val type: String? = null
 )
 
+/**
+ * Image reference with associated node ID for tracking which node produced the image
+ */
+data class NodeImageRef(
+    val nodeId: String,
+    val imageRef: ImageRef
+)
+
+@Serializable
+data class ImageUploadResponse(
+    val name: String,
+    val subfolder: String = "",
+    val type: String = "input"
+)
+
 @Serializable
 data class WsMessage(
     val type: String,

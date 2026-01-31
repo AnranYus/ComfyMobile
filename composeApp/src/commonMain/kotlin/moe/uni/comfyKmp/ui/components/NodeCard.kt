@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,16 +15,21 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Casino
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -48,11 +54,15 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.floatOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.longOrNull
 import moe.uni.comfyKmp.data.NodeStatus
 import moe.uni.comfyKmp.ui.theme.ComfySpacing
@@ -231,8 +241,13 @@ enum class EditableNodeType {
     CHECKPOINT_LOADER,
     VAE_LOADER,
     LORA_LOADER,
+    CONTROLNET_LOADER,
     CLIP_TEXT_ENCODE,
     EMPTY_LATENT_IMAGE,
+    LOAD_IMAGE,
+    CANNY_PREPROCESSOR,
+    CONTROLNET_APPLY,
+    PREVIEW_IMAGE,
     OTHER
 }
 
@@ -249,12 +264,25 @@ fun detectNodeType(classType: String): EditableNodeType {
         normalized.contains("loraloader") || 
         normalized.contains("lora_loader") ||
         normalized == "load lora" -> EditableNodeType.LORA_LOADER
+        normalized.contains("controlnetloader") ||
+        normalized.contains("controlnet_loader") ||
+        normalized == "load controlnet" -> EditableNodeType.CONTROLNET_LOADER
         normalized.contains("cliptextencode") || 
         normalized.contains("clip_text_encode") ||
         normalized == "clip text encode" -> EditableNodeType.CLIP_TEXT_ENCODE
         normalized.contains("emptylatentimage") ||
         normalized.contains("empty_latent_image") ||
         normalized == "empty latent image" -> EditableNodeType.EMPTY_LATENT_IMAGE
+        normalized.contains("loadimage") ||
+        normalized == "load image" -> EditableNodeType.LOAD_IMAGE
+        normalized.contains("cannyedge") ||
+        (normalized.contains("canny") && normalized.contains("preprocessor")) -> 
+            EditableNodeType.CANNY_PREPROCESSOR
+        normalized.contains("apply controlnet") ||
+        normalized.contains("applycontrolnet") ||
+        normalized.contains("cr apply controlnet") -> EditableNodeType.CONTROLNET_APPLY
+        normalized.contains("previewimage") ||
+        normalized == "preview image" -> EditableNodeType.PREVIEW_IMAGE
         else -> EditableNodeType.OTHER
     }
 }
@@ -264,6 +292,7 @@ fun getModelFolder(nodeType: EditableNodeType): String? {
         EditableNodeType.CHECKPOINT_LOADER -> "checkpoints"
         EditableNodeType.VAE_LOADER -> "vae"
         EditableNodeType.LORA_LOADER -> "loras"
+        EditableNodeType.CONTROLNET_LOADER -> "controlnet"
         else -> null
     }
 }
@@ -278,11 +307,16 @@ fun EditableNodeCard(
     isRandomSeedEnabled: Boolean = false,
     modelOptions: List<String> = emptyList(),
     isLoadingModels: Boolean = false,
+    imagePreview: ImageBitmap? = null,
+    isUploadingImage: Boolean = false,
+    nodeOutputPreview: ImageBitmap? = null,
+    isLoadingNodeOutput: Boolean = false,
     modifier: Modifier = Modifier,
     onInputChange: (field: String, value: JsonElement) -> Unit = { _, _ -> },
     onRandomSeedToggle: (enabled: Boolean) -> Unit = {},
     onRandomizeSeed: () -> Unit = {},
-    onLoadModels: () -> Unit = {}
+    onLoadModels: () -> Unit = {},
+    onSelectImage: () -> Unit = {}
 ) {
     val comfyColors = MaterialTheme.comfyColors
     val nodeType = remember(classType) { detectNodeType(classType) }
@@ -352,8 +386,13 @@ fun EditableNodeCard(
                                     EditableNodeType.CHECKPOINT_LOADER -> "模型"
                                     EditableNodeType.VAE_LOADER -> "VAE"
                                     EditableNodeType.LORA_LOADER -> "LoRA"
+                                    EditableNodeType.CONTROLNET_LOADER -> "ControlNet"
                                     EditableNodeType.CLIP_TEXT_ENCODE -> "提示词"
                                     EditableNodeType.EMPTY_LATENT_IMAGE -> "空潜图"
+                                    EditableNodeType.LOAD_IMAGE -> "图像"
+                                    EditableNodeType.CANNY_PREPROCESSOR -> "Canny边缘"
+                                    EditableNodeType.CONTROLNET_APPLY -> "应用CN"
+                                    EditableNodeType.PREVIEW_IMAGE -> "预览"
                                     else -> ""
                                 },
                                 style = MaterialTheme.typography.labelSmall,
@@ -411,7 +450,8 @@ fun EditableNodeCard(
                         }
                         EditableNodeType.CHECKPOINT_LOADER,
                         EditableNodeType.VAE_LOADER,
-                        EditableNodeType.LORA_LOADER -> {
+                        EditableNodeType.LORA_LOADER,
+                        EditableNodeType.CONTROLNET_LOADER -> {
                             ModelSelector(
                                 nodeType = nodeType,
                                 inputs = inputs,
@@ -431,6 +471,33 @@ fun EditableNodeCard(
                             EmptyLatentImageEditor(
                                 inputs = inputs,
                                 onInputChange = onInputChange
+                            )
+                        }
+                        EditableNodeType.LOAD_IMAGE -> {
+                            LoadImageEditor(
+                                inputs = inputs,
+                                imagePreview = imagePreview,
+                                isUploading = isUploadingImage,
+                                onSelectImage = onSelectImage,
+                                onInputChange = onInputChange
+                            )
+                        }
+                        EditableNodeType.CANNY_PREPROCESSOR -> {
+                            CannyEdgeEditor(
+                                inputs = inputs,
+                                onInputChange = onInputChange
+                            )
+                        }
+                        EditableNodeType.CONTROLNET_APPLY -> {
+                            ControlNetApplyEditor(
+                                inputs = inputs,
+                                onInputChange = onInputChange
+                            )
+                        }
+                        EditableNodeType.PREVIEW_IMAGE -> {
+                            PreviewImageViewer(
+                                outputPreview = nodeOutputPreview,
+                                isLoading = isLoadingNodeOutput
                             )
                         }
                         EditableNodeType.OTHER -> {
@@ -606,6 +673,7 @@ private fun ModelSelector(
         EditableNodeType.CHECKPOINT_LOADER -> "ckpt_name"
         EditableNodeType.VAE_LOADER -> "vae_name"
         EditableNodeType.LORA_LOADER -> "lora_name"
+        EditableNodeType.CONTROLNET_LOADER -> "control_net_name"
         else -> return
     }
     
@@ -622,6 +690,7 @@ private fun ModelSelector(
                     EditableNodeType.CHECKPOINT_LOADER -> "模型"
                     EditableNodeType.VAE_LOADER -> "VAE"
                     EditableNodeType.LORA_LOADER -> "LoRA"
+                    EditableNodeType.CONTROLNET_LOADER -> "ControlNet"
                     else -> "选择"
                 },
                 style = MaterialTheme.typography.labelMedium,
@@ -874,5 +943,287 @@ private fun PromptEditor(
             shape = RoundedCornerShape(12.dp),
             placeholder = { Text("输入提示词...") }
         )
+    }
+}
+
+@Composable
+private fun LoadImageEditor(
+    inputs: Map<String, JsonElement>,
+    imagePreview: ImageBitmap?,
+    isUploading: Boolean,
+    onSelectImage: () -> Unit,
+    onInputChange: (String, JsonElement) -> Unit
+) {
+    val currentImage = inputs["image"]?.let {
+        (it as? JsonPrimitive)?.contentOrNull
+    } ?: ""
+
+    Column(verticalArrangement = Arrangement.spacedBy(ComfySpacing.md)) {
+        Text(
+            text = "图像",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        // 缩略图预览
+        if (imagePreview != null) {
+            Image(
+                bitmap = imagePreview,
+                contentDescription = "预览",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp)
+                    .clip(RoundedCornerShape(8.dp)),
+                contentScale = ContentScale.Fit
+            )
+        }
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(ComfySpacing.sm),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = currentImage.ifEmpty { "未选择图片" },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+
+            FilledTonalButton(
+                onClick = onSelectImage,
+                enabled = !isUploading,
+                contentPadding = PaddingValues(horizontal = ComfySpacing.md)
+            ) {
+                if (isUploading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("上传中...")
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Image,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text("选择图片")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CannyEdgeEditor(
+    inputs: Map<String, JsonElement>,
+    onInputChange: (String, JsonElement) -> Unit
+) {
+    val lowThreshold = inputs["low_threshold"]?.let {
+        (it as? JsonPrimitive)?.intOrNull
+    } ?: 100
+    val highThreshold = inputs["high_threshold"]?.let {
+        (it as? JsonPrimitive)?.intOrNull
+    } ?: 200
+    val resolution = inputs["resolution"]?.let {
+        (it as? JsonPrimitive)?.contentOrNull
+    } ?: "512"
+
+    Column(verticalArrangement = Arrangement.spacedBy(ComfySpacing.md)) {
+        // Low Threshold Slider
+        Column(verticalArrangement = Arrangement.spacedBy(ComfySpacing.sm)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "低阈值",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = lowThreshold.toString(),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Slider(
+                value = lowThreshold.toFloat(),
+                onValueChange = {
+                    onInputChange("low_threshold", JsonPrimitive(it.toInt()))
+                },
+                valueRange = 0f..255f,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        // High Threshold Slider
+        Column(verticalArrangement = Arrangement.spacedBy(ComfySpacing.sm)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "高阈值",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = highThreshold.toString(),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Slider(
+                value = highThreshold.toFloat(),
+                onValueChange = {
+                    onInputChange("high_threshold", JsonPrimitive(it.toInt()))
+                },
+                valueRange = 0f..255f,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        // Resolution TextField
+        Column(verticalArrangement = Arrangement.spacedBy(ComfySpacing.xs)) {
+            Text(
+                text = "分辨率",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            OutlinedTextField(
+                value = resolution,
+                onValueChange = { newValue ->
+                    newValue.toIntOrNull()?.let {
+                        onInputChange("resolution", JsonPrimitive(it))
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                placeholder = { Text("如 512") }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ControlNetApplyEditor(
+    inputs: Map<String, JsonElement>,
+    onInputChange: (String, JsonElement) -> Unit
+) {
+    val switchValue = inputs["switch"]?.let {
+        (it as? JsonPrimitive)?.contentOrNull
+    } ?: "On"
+    val strength = inputs["strength"]?.let {
+        (it as? JsonPrimitive)?.floatOrNull
+    } ?: 1.0f
+
+    Column(verticalArrangement = Arrangement.spacedBy(ComfySpacing.md)) {
+        // Switch toggle
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "启用",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Switch(
+                checked = switchValue == "On",
+                onCheckedChange = { enabled ->
+                    onInputChange("switch", JsonPrimitive(if (enabled) "On" else "Off"))
+                }
+            )
+        }
+
+        // Strength slider
+        Column(verticalArrangement = Arrangement.spacedBy(ComfySpacing.sm)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "强度",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = formatTwoDecimals(strength),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Slider(
+                value = strength,
+                onValueChange = {
+                    onInputChange("strength", JsonPrimitive(it.toDouble()))
+                },
+                valueRange = 0f..2f,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@Composable
+private fun PreviewImageViewer(
+    outputPreview: ImageBitmap?,
+    isLoading: Boolean
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(ComfySpacing.sm)) {
+        Text(
+            text = "预览输出",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(200.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center
+        ) {
+            when {
+                outputPreview != null -> {
+                    Image(
+                        bitmap = outputPreview,
+                        contentDescription = "预览输出",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit
+                    )
+                }
+                isLoading -> {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(ComfySpacing.sm)
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Text(
+                            text = "加载中...",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                else -> {
+                    Text(
+                        text = "等待执行...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
     }
 }
