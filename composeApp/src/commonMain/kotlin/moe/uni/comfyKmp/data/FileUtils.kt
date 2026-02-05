@@ -1,6 +1,7 @@
 package moe.uni.comfyKmp.data
 
 import okio.FileSystem
+import okio.SYSTEM
 
 fun saveToTemp(bytes: ByteArray, filename: String): String {
     val dir = FileSystem.SYSTEM_TEMPORARY_DIRECTORY
